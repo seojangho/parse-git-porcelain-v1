@@ -16,18 +16,19 @@ struct git_status {
 
 void process_line(int first_char, struct git_status *st);
 void process_tracking_info(struct git_status *st);
+void try_match_tracking_info(struct git_status *st, const int first_char);
 bool match_tracking_info(const char *condition);
 void skip_until_newline(void);
 void print_status(struct git_status *st);
 
 void print_status(struct git_status *st) {
-	if (st->branch_ahead) {
+	if (st->branch_ahead && !st->branch_behind) {
 		printf("A");
 	}
-	if (st->branch_behind) {
+	if (st->branch_behind && !st->branch_ahead) {
 		printf("B");
 	}
-	if (st->branch_diverged) {
+	if (st->branch_diverged || (st->branch_ahead && st->branch_behind)) {
 		printf("D");
 	}
 	if (st->dirty) {
@@ -157,10 +158,31 @@ void process_tracking_info(struct git_status *st) {
 			break;
 		}
 	}
-	first_char = getc(stdin);
-	if (first_char == EOF || first_char == '\n') {
-		return;
+	while (true) {
+		first_char = getc(stdin);
+		if (first_char == EOF || first_char == '\n') {
+			return;
+		}
+		try_match_tracking_info(st, first_char);
+		bool met_comma = false;
+		while (true) {
+			first_char = getc(stdin);
+			if (first_char == EOF || first_char == '\n') {
+				return;
+			}
+			if (first_char == ',') {
+				met_comma = true;
+				continue;
+			}
+			if (first_char == ' ' && met_comma) {
+				break;
+			}
+			met_comma = false;
+		}
 	}
+}
+
+void try_match_tracking_info(struct git_status *st, const int first_char) {
 	if (first_char == 'a') {
 		if (match_tracking_info("ahead")) {
 			st->branch_ahead = true;
@@ -179,7 +201,6 @@ void process_tracking_info(struct git_status *st) {
 		}
 		return;
 	}
-	skip_until_newline();
 }
 
 bool match_tracking_info(const char *condition) {
@@ -191,12 +212,10 @@ bool match_tracking_info(const char *condition) {
 			return false;
 		}
 		if (first_char != condition[index]) {
-			skip_until_newline();
 			return false;
 		}
 		index++;
 		if (condition[index] == 0) {
-			skip_until_newline();
 			return true;
 		}
 	}
