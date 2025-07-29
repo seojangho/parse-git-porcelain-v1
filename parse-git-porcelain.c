@@ -97,6 +97,7 @@ void process_line(int fi, struct git_status *st) {
 	}
 	if (fi == 'M' && se == 'M') {
 		st->added = true;
+		st->modified = true;
 		skip_until_newline();
 		return;
 	}
